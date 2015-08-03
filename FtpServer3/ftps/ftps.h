@@ -30,14 +30,14 @@
 
 #include "console.h"
 
-#define FTP_VERSION              "FTP-2015-06-23"
+#define FTP_VERSION              "FTP-2015-07-31"
 
 #define FTP_USER                 "Stm32"
 #define FTP_PASS                 "Chibi"
 
 #define FTP_SERVER_PORT          21
 #define FTP_DATA_PORT            55600         // Data port in passive mode
-#define FTP_TIME_OUT             5             // Disconnect client after 5 minutes of inactivity
+#define FTP_TIME_OUT             10            // Disconnect client after 5 minutes of inactivity
 #define FTP_PARAM_SIZE           _MAX_LFN + 8
 #define FTP_CWD_SIZE             _MAX_LFN + 8  // max size of a directory name
 
@@ -48,7 +48,8 @@
 #define FTP_BUF_SIZE             512
 
 #define SERVER_THREAD_STACK_SIZE 256
-#define FTP_THREAD_STACK_SIZE    ( 1536 + FTP_BUF_SIZE + ( 5 * _MAX_LFN ))
+//#define FTP_THREAD_STACK_SIZE    ( 1536 + FTP_BUF_SIZE + ( 5 * _MAX_LFN ))
+#define FTP_THREAD_STACK_SIZE    ( 1600 + FTP_BUF_SIZE + ( 5 * _MAX_LFN ))
 
 #define FTP_THREAD_PRIORITY      (LOWPRIO + 2)
 
@@ -58,7 +59,7 @@ extern THD_WORKING_AREA( wa_ftp_server, SERVER_THREAD_STACK_SIZE );
 struct server_stru
 {
   uint8_t num;
-  uint8_t fase;   // for debugging only
+  // uint8_t fase;   // for debugging only
   struct netconn *ftpconn;
   binary_semaphore_t semrequest;
 };
@@ -104,11 +105,12 @@ private:
   bool fs_exists( char * path );
   bool fs_opendir( DIR * pdir, char * dirName );
 
-  char * i2str( uint32_t i );
+  char * i2str( int32_t i );
   char * makeDateTimeStr( uint16_t date, uint16_t time );
+  int8_t getDateTime( uint16_t * pdate, uint16_t * ptime );
 
   struct    netconn * listdataconn, * dataconn, * ctrlconn;
-  struct    netbuf  *inbuf;
+  struct    netbuf  * inbuf;
   struct    ip_addr ipclient;
   struct    ip_addr ipserver;
 
@@ -123,7 +125,7 @@ private:
   char      cwdName[ FTP_CWD_SIZE ];      // name of current directory
   char      cwdRNFR[ FTP_CWD_SIZE ];      // name of origin directory for Rename command
   char      path[ FTP_CWD_SIZE ];
-  char      str[ 15 ];
+  char      str[ 25 ];
   systime_t timeBeginTrans;
   uint32_t  bytesTransfered;
   int8_t    nerr;

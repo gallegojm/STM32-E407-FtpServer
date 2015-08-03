@@ -30,7 +30,11 @@ THD_WORKING_AREA( wa_ftp_conn[ FTP_NBR_CLIENTS ], FTP_THREAD_STACK_SIZE );
 //  array of parameters for each ftp thread
 struct server_stru ss[ FTP_NBR_CLIENTS ];
 
+// =========================================================
+//
 //  FTP connection thread.
+//
+// =========================================================
 
 THD_FUNCTION( ftp_conn, p )
 {
@@ -54,7 +58,11 @@ THD_FUNCTION( ftp_conn, p )
   }
 }
 
+// =========================================================
+//
 //  FTP server thread.
+//
+// =========================================================
 
 THD_FUNCTION( ftp_server, p )
 {
@@ -68,7 +76,6 @@ THD_FUNCTION( ftp_server, p )
   for( i = 0; i < FTP_NBR_CLIENTS; i ++ )
   {
     ss[ i ].num = i;
-    ss[ i ].fase = 0;
     ss[ i ].ftpconn = NULL;
     chBSemObjectInit( & ss[ i ].semrequest, true );
   }
@@ -85,6 +92,7 @@ THD_FUNCTION( ftp_server, p )
   // Bind to port 21 (FTP) with default IP address
   //    and put the connection into LISTEN state
   netconn_bind( ftpsrvconn, NULL, FTP_SERVER_PORT );
+
   netconn_listen( ftpsrvconn );
 
   //  Goes to the final priority after initialization

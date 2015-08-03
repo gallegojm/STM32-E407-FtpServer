@@ -22,39 +22,49 @@
 #include <stdlib.h>
 
 #include "ftps.h"
+#include <ntpc/ntpc.h>
+#include <sdlog/sdlog.h>
 
-extern bool fast_blink;
+extern bool   fast_blink;
+extern struct ntp_stru ntps;
+extern struct server_stru ss[ FTP_NBR_CLIENTS ];
 
 // =========================================================
+//
 //              Some utility functions
+//
 // =========================================================
 
-// Convert an integer to string (must be <= 9999999999)
+// Convert an integer to string
 //
 // parameters:
-//   s: string where the conversion is made (must be large enough
+//   s: string where the conversion is made (must be large enough)
 //   i: integer t convert
-//   z: size of returned string (leading space filled with '0'
+//   z: if >= 0, size of string s
+//      if < 0, size of returned string
+//              (must be <= than size of string s; leading space filled with '0')
 //
 // return pointer to string
 
-char * i2strZ( char * s, uint32_t i, uint8_t z )
+char * i2strZ( char * s, uint32_t i, int8_t z )
 {
-  char * psi = s + ( z > 0 ? z : sizeof( s ));
+  char * psi = s + abs( z );
 
   * -- psi = 0;
   if( i == 0 )
     * -- psi = '0';
   for( ; i; i /= 10 )
-    * -- psi = '0' + i% 10;
-  if( z > 0 )
+    * -- psi = '0' + i % 10;
+  if( z < 0 )
     while( psi > s )
       * -- psi = '0';
   return psi;
 }
 
 // =========================================================
+//
 //              Send a response to the client
+//
 // =========================================================
 
 void FtpServer::sendBegin( const char * s )
@@ -88,13 +98,17 @@ void FtpServer::sendWrite()
   COMMAND_PRINT( ">%u> %s", num, buf );
 }
 
-//  Convert an integer to string (must be <= 9999999999)
+//  Convert an integer to string
 //
 //  Return pointer to string
 
-char * FtpServer::i2str( uint32_t i )
+char * FtpServer::i2str( int32_t i )
 {
-  return i2strZ( str, i, 0 );
+  if( i >= 0 )
+    return i2strZ( str, i, 12 );
+  char * pstr = i2strZ( str + 1, - i, 12 );
+  * -- pstr = '-';
+  return pstr;
 }
 
 // Create string YYYYMMDDHHMMSS from date and time
@@ -107,17 +121,54 @@ char * FtpServer::i2str( uint32_t i )
 
 char * FtpServer::makeDateTimeStr( uint16_t date, uint16_t time )
 {
-  i2strZ( str, (( date & 0xFE00 ) >> 9 ) + 1980, 5 );
-  i2strZ( str + 4, ( date & 0x01E0 ) >> 5, 3 );
-  i2strZ( str + 6, date & 0x001F, 3 );
-  i2strZ( str + 8, ( time & 0xF800 ) >> 11, 3 );
-  i2strZ( str + 10, ( time & 0x07E0 ) >> 5, 3 );
-  i2strZ( str + 12, ( time & 0x001F ) << 1, 3 );
+  i2strZ( str, (( date & 0xFE00 ) >> 9 ) + 1980, -5 );
+  i2strZ( str + 4, ( date & 0x01E0 ) >> 5, -3 );
+  i2strZ( str + 6, date & 0x001F, -3 );
+  i2strZ( str + 8, ( time & 0xF800 ) >> 11, -3 );
+  i2strZ( str + 10, ( time & 0x07E0 ) >> 5, -3 );
+  i2strZ( str + 12, ( time & 0x001F ) << 1, -3 );
   return str;
 }
 
+// Calculate date and time from first parameter sent by MDTM command (YYYYMMDDHHMMSS)
+//
+// parameters:
+//   pdate, ptime: pointer of variables where to store data
+//
+// return:
+//    length of (time parameter + space) if date/time are ok
+//    0 if parameter is not YYYYMMDDHHMMSS
+
+int8_t FtpServer::getDateTime( uint16_t * pdate, uint16_t * ptime )
+{
+  // Date/time are expressed as a 14 digits long string
+  //   terminated by a space and followed by name of file
+  if( strlen( parameters ) < 15 || parameters[ 14 ] != ' ' )
+    return 0;
+  for( uint8_t i = 0; i < 14; i++ )
+    if( ! isdigit( parameters[ i ]))
+      return 0;
+
+  parameters[ 14 ] = 0;
+  * ptime = atoi( parameters + 12 ) >> 1;   // seconds
+  parameters[ 12 ] = 0;
+  * ptime |= atoi( parameters + 10 ) << 5;  // minutes
+  parameters[ 10 ] = 0;
+  * ptime |= atoi( parameters + 8 ) << 11;  // hours
+  parameters[ 8 ] = 0;
+  * pdate = atoi( parameters + 6 );         // days
+  parameters[ 6 ] = 0;
+  * pdate |= atoi( parameters + 4 ) << 5;   // months
+  parameters[ 4 ] = 0;
+  * pdate |= ( atoi( parameters ) - 1980 ) << 9;       // years
+
+  return 15;
+}
+
 // =========================================================
+//
 //             Get a command from the client
+//
 // =========================================================
 
 // update variables command and parameters
@@ -189,7 +240,9 @@ int8_t FtpServer::readCommand()
 }
 
 // =========================================================
+//
 //               Functions for data connection
+//
 // =========================================================
 
 bool FtpServer::listenDataConn()
@@ -302,7 +355,9 @@ void FtpServer::dataWrite( const char * data )
 }
 
 // =========================================================
+//
 //                  Functions on files
+//
 // =========================================================
 
 // Make complete path/name from cwdName and parameters
@@ -410,7 +465,9 @@ bool FtpServer::fs_opendir( DIR * pdir, char * dirName )
 }
 
 // =========================================================
+//
 //                   Process a command
+//
 // =========================================================
 
 bool FtpServer::processCommand( char * command, char * parameters )
@@ -663,13 +720,15 @@ bool FtpServer::processCommand( char * command, char * parameters )
           break;
         if( finfo.fname[0] == '.' )
           continue;
-
         strcpy( buf, "Type=" );
         strcat( buf, finfo.fattrib & AM_DIR ? "dir" : "file" );
         strcat( buf, ";Size=" );
         strcat( buf, i2str( finfo.fsize ));
-        strcat( buf, ";Modify=" );
-        strcat( buf, makeDateTimeStr( finfo.fdate, finfo.ftime ));
+        if( finfo.fdate != 0 )
+        {
+          strcat( buf, ";Modify=" );
+          strcat( buf, makeDateTimeStr( finfo.fdate, finfo.ftime ));
+        }
         strcat( buf, "; " );
         strcat( buf, lfn[0] == 0 ? finfo.fname : lfn );
         strcat( buf, "\r\n" );
@@ -868,6 +927,16 @@ bool FtpServer::processCommand( char * command, char * parameters )
       {
         DEBUG_PRINT(  "Creating directory %s\r\n", parameters );
         uint8_t ffs_result = f_mkdir( path );
+
+        RTCDateTime timespec;
+        struct tm stm;
+        rtcGetTime( & RTCD1, & timespec );
+        rtcConvertDateTimeToStructTm( & timespec, & stm, NULL );
+        DEBUG_PRINT( "Date/Time: %04u/%02u/%02u %02u:%02u:%02u\r\n",
+                     stm.tm_year + 1900, stm.tm_mon + 1, stm.tm_mday,
+                     stm.tm_hour, stm.tm_min, stm.tm_sec );
+
+
         if( ffs_result == FR_OK )
         {
           sendBegin( "257 \"" );
@@ -986,6 +1055,15 @@ bool FtpServer::processCommand( char * command, char * parameters )
       }
     }
   }
+  //
+  //  SYST
+  //
+  /*
+  else if( ! strcmp( command, "SYST" ))
+  {
+    sendWrite( "215 UNIX Type: L8" );
+  }
+  */
 
   ///////////////////////////////////////
   //                                   //
@@ -998,12 +1076,50 @@ bool FtpServer::processCommand( char * command, char * parameters )
   //
   else if( ! strcmp( command, "FEAT" ))
   {
-    sendBegin( "211-Extensions suported:\r\n") ;
-    // sendCat( " MDTM\r\n";
+    sendBegin( "211-Extensions supported:\r\n") ;
+    sendCat( " MDTM\r\n" );
     sendCat( " MLSD\r\n" );
     sendCat( " SIZE\r\n" );
     sendCat( " SITE FREE\r\n" );
     sendCatWrite( "211 End." );
+  }
+  //
+  //  MDTM - File Modification Time (see RFC 3659)
+  //
+  else if( ! strcmp( command, "MDTM" ))
+  {
+    char * fname;
+    uint16_t date, time;
+    uint8_t gettime;
+
+    gettime = getDateTime( & date, & time );
+    fname = parameters + gettime;
+
+    if( strlen( fname ) == 0 )
+      sendWrite( "501 No file name" );
+    else if( makePathFrom( path, fname ))
+    {
+      if( ! fs_exists( path ))
+      {
+        sendBegin( "550 File " );
+        sendCat( fname );
+        sendCatWrite( " not found" );
+      }
+      else if( gettime )
+      {
+        finfo.fdate = date;
+        finfo.ftime = time;
+        if( f_utime( path, & finfo ) == FR_OK )
+          sendWrite( "200 Ok" );
+        else
+          sendWrite( "550 Unable to modify time" );
+      }
+      else
+      {
+        sendBegin( "213 " );
+        sendCatWrite( makeDateTimeStr( finfo.fdate, finfo.ftime ));
+      }
+    }
   }
   //
   //  SIZE - Size of the file
@@ -1034,10 +1150,10 @@ bool FtpServer::processCommand( char * command, char * parameters )
       FATFS * fs;
       uint32_t free_clust;
       f_getfree( "0:", & free_clust, & fs );
-      sendBegin( "200 " );
+      sendBegin( "211 " );
       sendCat( i2str( free_clust * fs->csize >> 11 ));
       sendCat( " MB free of " );
-      sendCat( i2str(  (fs->n_fatent - 2) * fs->csize >> 11 ));
+      sendCat( i2str((fs->n_fatent - 2) * fs->csize >> 11 ));
       sendCatWrite( " MB capacity" );
     }
     else
@@ -1045,6 +1161,27 @@ bool FtpServer::processCommand( char * command, char * parameters )
       sendBegin( "500 Unknow SITE command " );
       sendCatWrite( parameters );
     }
+  }
+  //
+  //  STAT - Status command
+  //
+  else if( ! strcmp( command, "STAT" ))
+  {
+    uint8_t i, ncli;
+    for( i = 0, ncli = 0; i < FTP_NBR_CLIENTS; i ++ )
+      if( ss[ i ].ftpconn != NULL )
+        ncli ++;
+    sendBegin( "211-FTP server status\r\n" );
+    sendCat( " Local time is " );
+    sendCat( strLocalTime( str ));
+    sendCat( "\r\n " );
+    sendCat( i2str( ncli ));
+    sendCat( " user(s) currently connected to up to " );
+    sendCat( i2str( FTP_NBR_CLIENTS ));
+    sendCat( "\r\n You will be disconnected after " );
+    sendCat( i2str( FTP_TIME_OUT ));
+    sendCat( " minutes of inactivity\r\n" );
+    sendCatWrite( "211 End." );
   }
   //
   //  Unknow command
@@ -1055,16 +1192,25 @@ bool FtpServer::processCommand( char * command, char * parameters )
 }
 
 // =========================================================
+//
 //                       Ftp server
+//
 // =========================================================
 
 void FtpServer::service( int8_t n, struct netconn *ctrlcn )
 {
   uint16_t dummy;
+  struct ip_addr ippeer;
+  struct sdlog_stru sdl;
+  systime_t systemTimeBeginConnect;
+  RTCDateTime rtcBeginTime;
 
+  //  Led blink fast to show activity
   fast_blink = TRUE;
 
   // variables initialization
+  systemTimeBeginConnect = chVTGetSystemTimeX();
+  rtcGetTime( & RTCD1, & rtcBeginTime );
   strcpy( cwdName, "/" );  // Set the root directory
   cwdRNFR[ 0 ] = 0;
   num = n;
@@ -1077,12 +1223,13 @@ void FtpServer::service( int8_t n, struct netconn *ctrlcn )
   finfo.lfname = lfn;
   finfo.lfsize = _MAX_LFN + 1;
 
-  //  Get the local Ip
+  //  Get the local and peer IP
   netconn_addr( ctrlconn, & ipserver, & dummy );
+  netconn_peer( ctrlconn, & ippeer, & dummy );
 
   sendBegin( "220---   Welcome to FTP Server!   ---\r\n" );
-  sendCat( "220---  for ChibiOs & STM32-E407  ---\r\n" );
-  sendCat( "220---   by Jean-Michel Gallego   ---\r\n" );
+  sendCat( "   ---  for ChibiOs & STM32-E407  ---\r\n" );
+  sendCat( "   ---   by Jean-Michel Gallego   ---\r\n" );
   sendCat( "220 --   Version " );
   sendCat( FTP_VERSION );
   sendCatWrite( "   --" );
@@ -1140,11 +1287,29 @@ void FtpServer::service( int8_t n, struct netconn *ctrlcn )
   close:
   //  Close the connections
   dataClose();
-  // netconn_close( ctrlconn );
   if( listdataconn != NULL )
   {
     netconn_close( listdataconn );
     netconn_delete( listdataconn );
   }
+
+  //  Write data to log
+  uint32_t timeConnect = (uint32_t) ( chVTGetSystemTimeX() - systemTimeBeginConnect );
+  strRTCDateTime( str, & rtcBeginTime );
+  strcpy( buf, "Connected at " );
+  strcat( buf, str );
+  strcat( buf, " for" );
+  strSec2hms( str, timeConnect / CH_CFG_ST_FREQUENCY,
+              ( timeConnect % CH_CFG_ST_FREQUENCY ) / 10 );
+  strcat( buf, str );
+  strcat( buf, "\r\n" );
+  sdl.line = buf;
+  strcpy( str, "/Log/" );
+  strcat( str, ipaddr_ntoa( & ippeer ));
+  strcat( str, ".log" );
+  sdl.file = str;
+  sdl.append = false;
+  chMsgSend( tsdlog, (msg_t) & sdl );
+
   DEBUG_PRINT( "Client disconnected\r\n" );
 }

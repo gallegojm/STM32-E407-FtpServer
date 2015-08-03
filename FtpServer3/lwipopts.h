@@ -40,8 +40,6 @@
 
 #include <limits.h>
 
-
-
 /*
    -----------------------------------------------
    ---------- Platform specific locking ----------
@@ -321,7 +319,8 @@
  */
 #ifndef MEMP_NUM_NETBUF
 //#define MEMP_NUM_NETBUF                 2
-#define MEMP_NUM_NETBUF                 5
+//#define MEMP_NUM_NETBUF                 5
+#define MEMP_NUM_NETBUF                 6  // one for NTP
 #endif
 
 /**
@@ -330,7 +329,8 @@
  */
 #ifndef MEMP_NUM_NETCONN
 //#define MEMP_NUM_NETCONN                4
-#define MEMP_NUM_NETCONN                16
+//#define MEMP_NUM_NETCONN                16
+#define MEMP_NUM_NETCONN                17  // one for NTP
 #endif
 
 /**
@@ -684,7 +684,7 @@
  * LWIP_DHCP==1: Enable DHCP module.
  */
 #ifndef LWIP_DHCP
-//#define LWIP_DHCP                       0
+// #define LWIP_DHCP                       0
 #define LWIP_DHCP                       1
 #endif
 
@@ -821,7 +821,8 @@
  * transport.
  */
 #ifndef LWIP_DNS
-#define LWIP_DNS                        0
+//#define LWIP_DNS                        0
+#define LWIP_DNS                        1
 #endif
 
 /** DNS maximum number of entries to maintain locally. */
@@ -1121,14 +1122,14 @@
  * field.
  */
 #ifndef LWIP_NETIF_HOSTNAME
-#define LWIP_NETIF_HOSTNAME             1
+#define LWIP_NETIF_HOSTNAME             0
 #endif
 
 /**
  * LWIP_NETIF_API==1: Support netif api (in netifapi.c)
  */
 #ifndef LWIP_NETIF_API
-#define LWIP_NETIF_API                  1
+#define LWIP_NETIF_API                  0
 #endif
 
 /**

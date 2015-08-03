@@ -120,9 +120,12 @@ CSRC = $(STARTUPSRC) \
        $(LWSRC) \
        $(FATFSSRC) \
        $(CHIBIOS)/os/various/evtimer.c \
+       $(CHIBIOS)/os/various/syscalls.c \
        $(CHIBIOS)/os/hal/lib/streams/memstreams.c \
        $(CHIBIOS)/os/hal/lib/streams/chprintf.c \
-       $(CHIBIOS)/os/various/shell.c
+       $(CHIBIOS)/os/various/shell.c \
+       ntpc/ntpc.c \
+       sdlog/sdlog.c
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
@@ -154,10 +157,11 @@ TCPPSRC =
 ASMSRC = $(STARTUPASM) $(PORTASM) $(OSALASM)
 
 INCDIR = $(STARTUPINC) $(KERNINC) $(PORTINC) $(OSALINC) \
-         $(HALINC) $(PLATFORMINC) $(BOARDINC) $(TESTINC) \
+         $(HALINC) $(PLATFORMINC) $(BOARDINC) \
          $(CHCPPINC) $(CHIBIOS)/os/various \
          $(LWINC) $(FATFSINC) \
          $(CHIBIOS)/os/hal/lib/streams
+#         $(TESTINC)
 
 #
 # Project, sources and paths

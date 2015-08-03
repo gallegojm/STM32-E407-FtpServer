@@ -4,7 +4,9 @@
 *****************************************************************************
 
  Runs on an Olimex STM32-E407 board.
- Build with ChibiStudio and chibios 3.0.0p5
+ Build with ChibiStudio and chibios 3.0
+ Use the patch lwip_bindings.zip uploaded by steved at:
+    http://forum.chibios.org/phpbb/download/file.php?id=863
 
  User and password are defined in ftps.h
  
@@ -12,23 +14,26 @@
  
  Some definitions in lwipopts.h depend on the number of clients:
     MEMP_NUM_TCP_PCB   must be   >= 2 * FTP_NBR_CLIENTS
-    MEMP_NUM_NETBUF    must be   >= FTP_NBR_CLIENTS
-    MEMP_NUM_NETCONN   must be   >= 1 + 3 * FTP_NBR_CLIENTS
- 
+    MEMP_NUM_NETBUF    must be   >= FTP_NBR_CLIENTS (+1 for NTP client)
+    MEMP_NUM_NETCONN   must be   >= 1 + 3 * FTP_NBR_CLIENTS (+1 for NTP client)
+
  For example,
 in ftps.h :
 #define FTP_NBR_CLIENTS          4
 
 in lwipopts.h :
 #define MEMP_NUM_TCP_PCB         8
-#define MEMP_NUM_NETBUF          4
-#define MEMP_NUM_NETCONN         13
+#define MEMP_NUM_NETBUF          5
+#define MEMP_NUM_NETCONN         14
 
  I also modified those definitions:
 #define MEM_SIZE                 6400
 #define LWIP_DHCP                1       // to enable DHCP
 #define TCP_MSS                  1460
 #define LWIP_SO_RCVTIMEO         1
+
+For NTP client to use DNS it also necessary to modify:
+#define LWIP_DNS                 1
  
  In ffconf.h , I modified 2 definitions:
 #define _FS_REENTRANT   1       /* 0:Disable or 1:Enable */
@@ -47,6 +52,7 @@ in lwipopts.h :
    RNTO, RNFR
    FEAT, SIZE
    SITE FREE
+   STAT
 
  Tested with those clients:
    on Windows: FTP Rush, Filezilla
@@ -56,7 +62,19 @@ in lwipopts.h :
 
  It is no more necessary (as it was in the previous version) to force
    the client to use the primary connection for data transfers.
+
+ The server now use the RTC clock to timestamp the uploaded files.
+ The clock is synchronized daily with a list of NTP servers.
+ This list (NTP_SERVER_LIST) is defined in ntpc.h
+ It is also possible to modify:
+  - the time difference between UTC and local time (NTP_LOCAL_DIFFERERENCE),
+  - the Day Saving Time flag (NTP_LOCAL_DST),
+  - the time of the day at which synchronization is done (NTP_TIME_SYNCHRO).
+  
+ Some information about server status is logged on the SD card.
+ This is useful to monitor the behavior of the RTC.
+ This information is stored in subdirectory /Log .
  
  For debugging, modify the definition of DEBUG_PRINT and/or COMMAND_PRINT
-   in file console.h, connect USB-OTG#2 to the PC and open a terminal
+   in file console.h, connect USB-OTG#2 to the PC and open a terminal.
    
