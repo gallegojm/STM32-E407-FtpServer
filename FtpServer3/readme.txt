@@ -5,7 +5,9 @@
 
  Runs on an Olimex STM32-E407 board.
  Build with ChibiStudio and chibios 3.0
- Use the patch lwip_bindings.zip uploaded by steved at:
+
+ Configuration of the local IP and Mac address is done in main.cpp thanks to 
+the patch lwip_bindings.zip uploaded by steved at:
     http://forum.chibios.org/phpbb/download/file.php?id=863
 
  User and password are defined in ftps.h
@@ -73,7 +75,7 @@ For NTP client to use DNS it also necessary to modify:
   
  Some information about server status is logged on the SD card.
  This is useful to monitor the behavior of the RTC.
- This information is stored in subdirectory /Log .
+ You must create manually the subdirectory /Log where are stored those files.
  
  For debugging, modify the definition of DEBUG_PRINT and/or COMMAND_PRINT
    in file console.h, connect USB-OTG#2 to the PC and open a terminal.
