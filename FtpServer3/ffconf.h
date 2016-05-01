@@ -192,9 +192,9 @@
 
 
 //#define _FS_REENTRANT   0       /* 0:Disable or 1:Enable */
-#define _FS_REENTRANT   1       /* 0:Disable or 1:Enable */
-//#define _FS_TIMEOUT     1000    /* Timeout period in unit of time tick */
-#define _FS_TIMEOUT     MS2ST( 2000 )   /* Timeout period in milliseconds */
+#define _FS_REENTRANT   1               /* 0:Disable or 1:Enable */
+//#define _FS_TIMEOUT     MS2ST(1000)     /* Timeout period in unit of time tick */
+#define _FS_TIMEOUT     MS2ST( 4000 )     /* Timeout period in unit of time tick */
 #define _SYNC_t         semaphore_t*    /* O/S dependent sync object type. e.g. HANDLE, OS_EVENT*, ID, SemaphoreHandle_t and etc.. */
 /* The _FS_REENTRANT option switches the re-entrancy (thread safe) of the FatFs module.
 /

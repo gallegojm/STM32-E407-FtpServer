@@ -38,8 +38,6 @@
 #ifndef __LWIPOPT_H__
 #define __LWIPOPT_H__
 
-#include <limits.h>
-
 /*
    -----------------------------------------------
    ---------- Platform specific locking ----------
@@ -240,7 +238,7 @@
 #endif
 
 /**
- * MEMP_NUM_TCP_PCB: the number of simultaneously active TCP connections.
+ * MEMP_NUM_TCP_PCB: the number of simulatenously active TCP connections.
  * (requires the LWIP_TCP option)
  */
 #ifndef MEMP_NUM_TCP_PCB
@@ -370,8 +368,6 @@
  * MEMP_NUM_SNMP_VARBIND: the number of concurrent requests (does not have to
  * be changed normally) - 2 of these are used per request (1 for input,
  * 1 for output)
- * If multiple variables are passed in a single request, this number needs increasing to at least (NUMVAR * 2)
- * (e.g. GetIf sysinfo request)
  */
 #ifndef MEMP_NUM_SNMP_VARBIND
 #define MEMP_NUM_SNMP_VARBIND           2
@@ -381,8 +377,6 @@
  * MEMP_NUM_SNMP_VALUE: the number of OID or values concurrently used
  * (does not have to be changed normally) - 3 of these are used per request
  * (1 for the value read and 2 for OIDs - input and output)
- * If multiple variables are passed in a single request, this number needs increasing to at least 1+ (NUMVAR * 2)
- * (e.g. GetIf sysinfo request)
  */
 #ifndef MEMP_NUM_SNMP_VALUE
 #define MEMP_NUM_SNMP_VALUE             3
@@ -1122,7 +1116,8 @@
  * field.
  */
 #ifndef LWIP_NETIF_HOSTNAME
-#define LWIP_NETIF_HOSTNAME             0
+//#define LWIP_NETIF_HOSTNAME             0
+#define LWIP_NETIF_HOSTNAME             1
 #endif
 
 /**
@@ -1253,14 +1248,9 @@
  * TCPIP_THREAD_STACKSIZE: The stack size used by the main tcpip thread.
  * The stack size value itself is platform-dependent, but is passed to
  * sys_thread_new() when the thread is created.
- * SNMP requires a larger stack
  */
 #ifndef TCPIP_THREAD_STACKSIZE
-#if LWIP_SNMP
-#define TCPIP_THREAD_STACKSIZE          1400
-#else
 #define TCPIP_THREAD_STACKSIZE          1024
-#endif
 #endif
 
 /**
@@ -1269,6 +1259,7 @@
  * sys_thread_new() when the thread is created.
  */
 #ifndef TCPIP_THREAD_PRIO
+//#define TCPIP_THREAD_PRIO               (LOWPRIO + 1)
 #define TCPIP_THREAD_PRIO               (LOWPRIO + 2)
 #endif
 
@@ -1303,6 +1294,7 @@
  * sys_thread_new() when the thread is created.
  */
 #ifndef SLIPIF_THREAD_PRIO
+//#define SLIPIF_THREAD_PRIO              (LOWPRIO + 1)
 #define SLIPIF_THREAD_PRIO              (LOWPRIO + 2)
 #endif
 
@@ -1328,6 +1320,7 @@
  * sys_thread_new() when the thread is created.
  */
 #ifndef PPP_THREAD_PRIO
+//#define PPP_THREAD_PRIO                 (LOWPRIO + 1)
 #define PPP_THREAD_PRIO                 (LOWPRIO + 2)
 #endif
 
@@ -1353,6 +1346,7 @@
  * sys_thread_new() when the thread is created.
  */
 #ifndef DEFAULT_THREAD_PRIO
+//#define DEFAULT_THREAD_PRIO             (LOWPRIO + 1)
 #define DEFAULT_THREAD_PRIO             (LOWPRIO + 2)
 #endif
 
@@ -1486,7 +1480,8 @@
  * LWIP_SO_RCVBUF==1: Enable SO_RCVBUF processing.
  */
 #ifndef LWIP_SO_RCVBUF
-#define LWIP_SO_RCVBUF                  1
+#define LWIP_SO_RCVBUF                  0
+//#define LWIP_SO_RCVBUF                  1
 #endif
 
 /**

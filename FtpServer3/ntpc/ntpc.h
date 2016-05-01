@@ -34,7 +34,7 @@
 
 #include "console.h"
 
-#define NTP_VERSION                     "2015-07-30"
+#define NTP_VERSION                     "2015-08-14"
 
 #define NTP_PORT                        123
 
@@ -57,16 +57,18 @@
                         "venezuela.pool.ntp.org"
 
 // Number of seconds to add to get unix local time
-//  ( minus 4 hours and half for Venezuela )
-#define NTP_LOCAL_DIFFERERENCE          ( - 60UL * ( 4 * 60 + 30 ))
-// #define NTP_LOCAL_DIFFERERENCE          0  // UTC
+//  ( minus 4 hours for Venezuela since May 1, 2016)
+#define NTP_LOCAL_DIFFERERENCE          ( - 60UL * 4 * 60 )
+//  ( minus 4 hours and half for Venezuela until April 30, 2016)
+// #define NTP_LOCAL_DIFFERERENCE          ( - 60UL * ( 4 * 60 + 30 ))
+// UTC
+// #define NTP_LOCAL_DIFFERERENCE          0
 
 // Set to 1 to enable Day Saving Time
 #define NTP_LOCAL_DST                   0
 
 // Time of the day for synchronization (hour and minutes)
 #define NTP_TIME_SYNCHRO                ( 4UL * 60 + 15 ) // 4h 15mn in the night
-// #define NTP_TIME_SYNCHRO                ( 13UL * 60 + 50 )
 
 // Delay in minutes between retries in case of failure
 #define NTP_DELAY_FAILURE               5
@@ -85,10 +87,11 @@
 struct ntp_stru
 {
   ip_addr_t addr;
-  time_t    unixLocalTime;
-  time_t    unixTime;
-  uint32_t  elapsed;
+  uint32_t  unixLocalTime;
+  uint32_t  unixTime;
+  int32_t   elapsed;
   int32_t   lag;
+  int32_t   calibration;
   uint8_t   fase;
   int8_t    err;
 };
@@ -100,7 +103,7 @@ extern "C" {
 #endif
   THD_FUNCTION( ntp_scheduler, p );
   char * strSec2hms( char * str, uint32_t sec, uint32_t msec );
-  char * strUTime( char * str, time_t tt );
+  char * strUTime( char * str, uint32_t tt );
   char * strRTCDateTime( char * str, RTCDateTime * prtcdt );
   char * strLocalTime( char * str );
 #ifdef __cplusplus

@@ -24,42 +24,11 @@
 #include "ftps.h"
 #include <ntpc/ntpc.h>
 #include <sdlog/sdlog.h>
+#include <util.h>
 
 extern bool   fast_blink;
 extern struct ntp_stru ntps;
 extern struct server_stru ss[ FTP_NBR_CLIENTS ];
-
-// =========================================================
-//
-//              Some utility functions
-//
-// =========================================================
-
-// Convert an integer to string
-//
-// parameters:
-//   s: string where the conversion is made (must be large enough)
-//   i: integer t convert
-//   z: if >= 0, size of string s
-//      if < 0, size of returned string
-//              (must be <= than size of string s; leading space filled with '0')
-//
-// return pointer to string
-
-char * i2strZ( char * s, uint32_t i, int8_t z )
-{
-  char * psi = s + abs( z );
-
-  * -- psi = 0;
-  if( i == 0 )
-    * -- psi = '0';
-  for( ; i; i /= 10 )
-    * -- psi = '0' + i % 10;
-  if( z < 0 )
-    while( psi > s )
-      * -- psi = '0';
-  return psi;
-}
 
 // =========================================================
 //
@@ -104,11 +73,7 @@ void FtpServer::sendWrite()
 
 char * FtpServer::i2str( int32_t i )
 {
-  if( i >= 0 )
-    return i2strZ( str, i, 12 );
-  char * pstr = i2strZ( str + 1, - i, 12 );
-  * -- pstr = '-';
-  return pstr;
+  return int2str( str, i, 12 );
 }
 
 // Create string YYYYMMDDHHMMSS from date and time
@@ -121,12 +86,12 @@ char * FtpServer::i2str( int32_t i )
 
 char * FtpServer::makeDateTimeStr( uint16_t date, uint16_t time )
 {
-  i2strZ( str, (( date & 0xFE00 ) >> 9 ) + 1980, -5 );
-  i2strZ( str + 4, ( date & 0x01E0 ) >> 5, -3 );
-  i2strZ( str + 6, date & 0x001F, -3 );
-  i2strZ( str + 8, ( time & 0xF800 ) >> 11, -3 );
-  i2strZ( str + 10, ( time & 0x07E0 ) >> 5, -3 );
-  i2strZ( str + 12, ( time & 0x001F ) << 1, -3 );
+  int2strZ( str, (( date & 0xFE00 ) >> 9 ) + 1980, -5 );
+  int2strZ( str + 4, ( date & 0x01E0 ) >> 5, -3 );
+  int2strZ( str + 6, date & 0x001F, -3 );
+  int2strZ( str + 8, ( time & 0xF800 ) >> 11, -3 );
+  int2strZ( str + 10, ( time & 0x07E0 ) >> 5, -3 );
+  int2strZ( str + 12, ( time & 0x001F ) << 1, -3 );
   return str;
 }
 

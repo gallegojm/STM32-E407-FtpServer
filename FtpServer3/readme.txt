@@ -4,7 +4,7 @@
 *****************************************************************************
 
  Runs on an Olimex STM32-E407 board.
- Build with ChibiStudio and chibios 3.0
+ Build with ChibiStudio and chibios 3.0.1
 
  Configuration of the local IP and Mac address is done in main.cpp thanks to 
 the patch lwip_bindings.zip uploaded by steved at:
@@ -39,7 +39,7 @@ For NTP client to use DNS it also necessary to modify:
  
  In ffconf.h , I modified 2 definitions:
 #define _FS_REENTRANT   1       /* 0:Disable or 1:Enable */
-#define _FS_TIMEOUT     MS2ST( 2000 )   /* Timeout period in milliseconds */
+#define _FS_TIMEOUT     MS2ST( 4000 )   /* Timeout period in milliseconds */
 
  Commands implemented: 
    USER, PASS

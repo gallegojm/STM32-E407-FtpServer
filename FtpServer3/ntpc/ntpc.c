@@ -24,6 +24,7 @@
 
 #include "string.h"
 #include <sdlog/sdlog.h>
+#include <util.h>
 
 //  Stack area for the NTP Scheduler thread.
 THD_WORKING_AREA( wa_ntp_scheduler, NTP_SCHEDULER_THREAD_STACK_SIZE );
@@ -34,6 +35,45 @@ static char * ntpSrvAddr[] = { NTP_SERVER_LIST, NULL };
 //  Variables for debugging and statistics
 struct ntp_stru ntps;
 
+// Write to register RTC_CALR to calibrate RTC frequency
+//
+// cal is the number of cycles added or rested every 32 seconds.
+// cal > 0 and < +512 to accelerate the frequency
+// cal < 0 and > -511 to slow down the frequency
+// Each cycle correspond to a frequency variation of 0.954 ppm
+//
+// Return false if cal out of limits -511 +512
+
+bool rtcSmoothCalibration( int32_t cal )
+{
+  syssts_t sts;
+
+  // Check cal not out of bounds
+  if( cal > 512 || cal < -511 )
+    return false;
+
+  // See DM00031020.pdf :
+  //   26.3.11 RTC smooth digital calibration
+  if( cal <= 0 )
+    cal = abs( cal );
+  else
+    cal = RTC_CALR_CALP + ( 512 - cal );
+
+  // Entering a reentrant critical zone
+  sts = chSysGetStatusAndLockX();
+
+  // Wait for recalibration pending flag reset
+  while( ( RTCD1.rtc->ISR & RTC_ISR_RECALPF ) != 0 )
+    ;
+
+  // Write to RTC calibration register
+  RTCD1.rtc->CALR = cal;
+
+  // Leaving a reentrant critical zone
+  chSysRestoreStatusX( sts );
+
+  return true;
+}
 
 uint32_t ntpClient( const char * serverAddr )
 {
@@ -151,6 +191,7 @@ bool ntpRequest( void )
   uint8_t     i = 0;
   uint32_t    secsSince1900 = 0;
   uint32_t    lastUnixTime;
+  int32_t     dcal;
   RTCDateTime timespec;
   struct tm   timp;
 
@@ -168,19 +209,30 @@ bool ntpRequest( void )
   rtcConvertDateTimeToStructTm( & timespec, & timp, NULL );
   ntps.unixLocalTime = mktime( & timp );
 
-  // Update RTC
+  // Update local time
   lastUnixTime = ntps.unixTime;
   ntps.unixTime = secsSince1900 - NTP_SEVENTY_YEARS + NTP_LOCAL_DIFFERERENCE;
-  rtcConvertStructTmToDateTime( gmtime( & ntps.unixTime ), 0, & timespec );
+  rtcConvertStructTmToDateTime( gmtime((time_t *) & ntps.unixTime ), 0, & timespec );
   rtcSetTime( & RTCD1, & timespec );
 
+  // Update RTC calibration
   if( lastUnixTime > 0 )
   {
-    ntps.elapsed = (uint32_t )ntps.unixTime - lastUnixTime;
-    ntps.lag = ntps.unixLocalTime - ntps.unixTime;
+    ntps.elapsed = ntps.unixTime - lastUnixTime;
+    ntps.lag = (int32_t) ntps.unixTime - (int32_t) ntps.unixLocalTime;
+    dcal = ( ntps.lag * 1048218 ) / ntps.elapsed;
+    ntps.calibration += dcal;
+    DEBUG_PRINT( "elapsed %D\r\n", ntps.elapsed );
+    DEBUG_PRINT( "lag     %D\r\n", ntps.lag );
+    DEBUG_PRINT( "dcal    %D\r\n", dcal );
+    DEBUG_PRINT( "calibr. %D\r\n", ntps.calibration );
+    rtcSmoothCalibration( ntps.calibration );
   }
   else
+  {
     ntps.elapsed = 0;
+    ntps.calibration = 0;
+  }
 
   return true;
 }
@@ -188,7 +240,7 @@ bool ntpRequest( void )
 // Create a string from a time in seconds
 // String str must be at least 14 characters long
 //    or 20 characters long if msec > 0
-// Format is xxxh xxmn xxs
+// Format is xxxh xxmn xxs or xxxh xxmn xxs xxxms
 
 char * strSec2hms( char * str, uint32_t sec, uint32_t msec )
 {
@@ -223,22 +275,29 @@ char * strSec2hms( char * str, uint32_t sec, uint32_t msec )
 
 // Create a string from tm structure
 // String str must be at least 20 characters long
+//    or 24 characters long if pmsec # NULL
 // Format is dd/mm/yyyy hh:mn:ss
+//    or dd/mm/yyyy hh:mn:ss.mmm
 
-char * strStructTm( char * str, struct tm * stm )
+char * strStructTm( char * str, struct tm * stm, uint32_t * pmsec )
 {
-  chsnprintf( str, 20, "%02u/%02u/%04u %02u:%02u:%02u",
-              stm->tm_mday, stm->tm_mon + 1, stm->tm_year + 1900,
-              stm->tm_hour, stm->tm_min, stm->tm_sec );
+  if( pmsec )
+    chsnprintf( str, 24, "%02u/%02u/%04u %02u:%02u:%02u.%03u",
+                stm->tm_mday, stm->tm_mon + 1, stm->tm_year + 1900,
+                stm->tm_hour, stm->tm_min, stm->tm_sec, * pmsec );
+  else
+    chsnprintf( str, 20, "%02u/%02u/%04u %02u:%02u:%02u",
+                stm->tm_mday, stm->tm_mon + 1, stm->tm_year + 1900,
+                stm->tm_hour, stm->tm_min, stm->tm_sec );
   return str;
 }
 
 // Create a string from time_t
 // string str must be at least 20 characters long
 
-char * strUTime( char * str, time_t tt )
+char * strUTime( char * str, uint32_t tt )
 {
-  return strStructTm( str, gmtime( & tt ));
+  return strStructTm( str, gmtime((time_t *) & tt ), NULL );
 }
 
 // Create a string from local time
@@ -247,9 +306,10 @@ char * strUTime( char * str, time_t tt )
 char * strRTCDateTime( char * str, RTCDateTime * prtcdt )
 {
   struct tm stm;
+  uint32_t msec;
 
-  rtcConvertDateTimeToStructTm( prtcdt, & stm, NULL );
-  return strStructTm( str, & stm );
+  rtcConvertDateTimeToStructTm( prtcdt, & stm, & msec );
+  return strStructTm( str, & stm, & msec );
 }
 
 // Create a string from local time
@@ -306,6 +366,10 @@ THD_FUNCTION( ntp_scheduler, p )
 
   chRegSetThreadName( "ntp_scheduler" );
 
+  ntps.unixTime = 0;
+  ntps.elapsed = 0;
+  ntps.calibration = 0;
+
   // Set RTC to a valid value, in case NTP fails at start up
   currentTime.year  = 2015 - 1980;
   currentTime.month = 1;  // January
@@ -313,6 +377,7 @@ THD_FUNCTION( ntp_scheduler, p )
   currentTime.millisecond = 0;
   currentTime.dstflag = NTP_LOCAL_DST;
   rtcSetTime( & RTCD1, & currentTime );
+  rtcSmoothCalibration( 0 );
 
   // Initialize structure for passing messages to SD logger
   sdl.file = "/Log/rtc.log";
@@ -331,6 +396,8 @@ THD_FUNCTION( ntp_scheduler, p )
       strcat( line, " SrvT: " );
       strUTime( str, ntps.unixTime );
       strcat( line, str );
+      strcat( line, " cal: " );
+      strcat( line, int2str( str, (int32_t) ntps.calibration, 12 ));
       strcat( line, " SrvIP: " );
       strcat( line, ipaddr_ntoa( & ntps.addr ));
       strcat( line, "\r\n" );
